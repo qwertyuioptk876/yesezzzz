@@ -1,0 +1,148 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local PlayerGui = player:WaitForChild("PlayerGui")
+
+-- 建立 ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "AutoClickerGUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = PlayerGui
+
+-------------------------------
+-- 主要的切換按鈕（圓形、青色半透明）
+-------------------------------
+local toggleButton = Instance.new("TextButton")
+toggleButton.Name = "ToggleButton"
+toggleButton.Size = UDim2.new(0, 100, 0, 100) -- 大小適中
+toggleButton.Position = UDim2.new(0, 20, 0, 20)
+toggleButton.BackgroundColor3 = Color3.fromRGB(0, 255, 255) -- 青色
+toggleButton.BackgroundTransparency = 0.5
+toggleButton.Text = "開始"
+toggleButton.TextScaled = true
+toggleButton.Parent = screenGui
+
+local toggleCorner = Instance.new("UICorner")
+toggleCorner.CornerRadius = UDim.new(1, 0)
+toggleCorner.Parent = toggleButton
+
+-------------------------------
+-- 目標圖標按鈕（較小、半透明圓形）
+-------------------------------
+local targetButton = Instance.new("TextButton")
+targetButton.Name = "TargetButton"
+targetButton.Size = UDim2.new(0, 70, 0, 70)
+targetButton.Position = UDim2.new(0, 150, 0, 20)
+targetButton.BackgroundColor3 = Color3.fromRGB(0, 255, 255)
+targetButton.BackgroundTransparency = 0.5
+targetButton.Text = ""
+targetButton.Parent = screenGui
+
+local targetCorner = Instance.new("UICorner")
+targetCorner.CornerRadius = UDim.new(1, 0)
+targetCorner.Parent = targetButton
+
+-------------------------------
+-- 點擊間隔輸入框（以秒為單位，可輸入小數）
+-------------------------------
+local intervalBox = Instance.new("TextBox")
+intervalBox.Name = "IntervalBox"
+intervalBox.Size = UDim2.new(0, 100, 0, 40)
+intervalBox.Position = UDim2.new(0, 20, 0, 140)
+intervalBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+intervalBox.Text = "0.1"  -- 預設 0.1 秒
+intervalBox.TextScaled = true
+intervalBox.ClearTextOnFocus = false
+intervalBox.Parent = screenGui
+
+local intervalCorner = Instance.new("UICorner")
+intervalCorner.CornerRadius = UDim.new(1, 0)
+intervalCorner.Parent = intervalBox
+
+-------------------------------
+-- 實作拖曳功能給所有 UI 元件
+-------------------------------
+local function makeDraggable(guiObject)
+    local dragging = false
+    local dragStart, startPos
+    guiObject.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = guiObject.AbsolutePosition
+        end
+    end)
+    guiObject.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            guiObject.Position = UDim2.new(0, startPos.X + delta.X, 0, startPos.Y + delta.Y)
+        end
+    end)
+    guiObject.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+end
+
+makeDraggable(toggleButton)
+makeDraggable(targetButton)
+makeDraggable(intervalBox)
+
+-------------------------------
+-- 自動點擊功能
+-------------------------------
+local autoClicking = false
+local clickConnection
+
+-- 用於啟動自動點擊迴圈的函數
+local function startAutoClick()
+    if clickConnection then clickConnection:Disconnect() end
+    clickConnection = RunService.RenderStepped:Connect(function()
+        -- 讀取間隔數值，確保其大於0
+        local interval = tonumber(intervalBox.Text)
+        if not interval or interval <= 0 then
+            interval = 0.1
+            intervalBox.Text = tostring(interval)
+        end
+        -- 為了減少 RenderStepped 頻率影響，這裡用 wait (可接受略微誤差)
+        wait(interval)
+        pcall(function()
+            -- 模擬點擊 targetButton，此處用 Activate() 方法（依賴第三方外掛環境的支援）
+            targetButton:Activate()
+        end)
+    end)
+end
+
+local function stopAutoClick()
+    if clickConnection then
+        clickConnection:Disconnect()
+        clickConnection = nil
+    end
+end
+
+-------------------------------
+-- 切換按鈕控制自動點擊狀態
+-------------------------------
+toggleButton.MouseButton1Click:Connect(function()
+    autoClicking = not autoClicking
+    if autoClicking then
+        toggleButton.Text = "停止"
+        startAutoClick()
+    else
+        toggleButton.Text = "開始"
+        stopAutoClick()
+    end
+end)
+
+-------------------------------
+-- 角色重生後保持UI功能（GUI 保留在 PlayerGui）
+-------------------------------
+player.CharacterAdded:Connect(function()
+    wait(0.5)
+    if autoClicking then
+        startAutoClick()
+    end
+end)
