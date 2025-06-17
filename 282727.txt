@@ -1,0 +1,132 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local player = Players.LocalPlayer
+
+-- 建立 GUI
+local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+gui.Name = "AutoClicker"
+gui.ResetOnSpawn = false
+
+-- 🌀 獨立拖曳函數
+local function makeDraggable(instance)
+	local dragging, offset
+
+	instance.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			offset = input.Position - instance.AbsolutePosition
+		end
+	end)
+
+	instance.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = false
+		end
+	end)
+
+	local connection
+	connection = UserInputService.InputChanged:Connect(function(input)
+		if not instance or not instance.Parent then
+			connection:Disconnect()
+			return
+		end
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			instance.Position = UDim2.new(0, input.Position.X - offset.X, 0, input.Position.Y - offset.Y)
+		end
+	end)
+end
+
+-- 🔘 按鈕（圓形）
+local button = Instance.new("TextButton", gui)
+button.Size = UDim2.new(0, 80, 0, 80)
+button.Position = UDim2.new(0.5, -40, 0.5, 10)
+button.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+button.Text = "開始"
+button.TextColor3 = Color3.fromRGB(255, 255, 255)
+button.TextScaled = true
+button.AutoButtonColor = false
+button.ZIndex = 2
+makeDraggable(button)
+Instance.new("UICorner", button).CornerRadius = UDim.new(1, 0)
+
+-- 🟠 彩虹邊框
+local fancyBorder = Instance.new("UIStroke", button)
+fancyBorder.Thickness = 6
+fancyBorder.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+fancyBorder.LineJoinMode = Enum.LineJoinMode.Round
+fancyBorder.Transparency = 0
+
+task.spawn(function()
+	while true do
+		for i = 0, 1, 0.01 do
+			fancyBorder.Color = Color3.fromHSV(i, 1, 1)
+			task.wait(0.03)
+		end
+	end
+end)
+
+-- 🎯 點擊圖標
+local icon = Instance.new("Frame", gui)
+icon.Size = UDim2.new(0, 50, 0, 50)
+icon.Position = UDim2.new(0.5, -25, 0.5, -100)
+icon.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+icon.BackgroundTransparency = 0.5
+icon.BorderSizePixel = 0
+icon.ZIndex = 2
+icon.Name = "TargetIcon"
+makeDraggable(icon)
+Instance.new("UICorner", icon).CornerRadius = UDim.new(1, 0)
+
+-- ⌨️ 輸入框
+local box = Instance.new("TextBox", gui)
+box.Size = UDim2.new(0, 100, 0, 40)
+box.Position = UDim2.new(0.5, -50, 0.5, 110)
+box.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+box.TextColor3 = Color3.fromRGB(255, 255, 255)
+box.PlaceholderText = "點擊間隔（秒）"
+box.TextScaled = true
+box.ClearTextOnFocus = false
+makeDraggable(box)
+Instance.new("UICorner", box).CornerRadius = UDim.new(0.3, 0)
+
+local boxStroke = Instance.new("UIStroke", box)
+boxStroke.Color = Color3.fromRGB(200, 0, 0)
+boxStroke.Thickness = 2
+boxStroke.Transparency = 0
+
+-- 🔁 點擊控制
+local clicking = false
+
+local function clickLoop()
+	while clicking do
+		local x = icon.AbsolutePosition.X + icon.AbsoluteSize.X / 2
+		local y = icon.AbsolutePosition.Y + icon.AbsoluteSize.Y / 2
+		VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
+		VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
+		local delayTime = tonumber(box.Text) or 0.1
+		if delayTime <= 0 then delayTime = 0.000001 end
+		for i = 1, math.floor(delayTime / 0.01) do
+			if not clicking then return end
+			task.wait(0.01)
+		end
+	end
+end
+
+-- ⏯️ 切換點擊
+button.MouseButton1Click:Connect(function()
+	clicking = not clicking
+	if clicking then
+		button.Text = "關閉"
+		button.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+		task.spawn(clickLoop) -- ← 這裡是你漏掉的
+	else
+		button.Text = "開始"
+		button.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+	end
+end)
+
+-- 👻 保留 GUI
+player.CharacterAdded:Connect(function()
+	gui.Parent = player:WaitForChild("PlayerGui")
+end)
