@@ -1,0 +1,48 @@
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+
+local PlaceId = game.PlaceId
+local JobIdToIgnore = game.JobId -- 不要傳送到現在這個伺服器
+
+local function getServerList(cursor)
+	local url = "https://games.roblox.com/v1/games/" .. PlaceId .. "/servers/Public?sortOrder=Desc&limit=100"
+	if cursor then
+		url = url .. "&cursor=" .. cursor
+	end
+	local success, response = pcall(function()
+		return HttpService:JSONDecode(game:HttpGet(url))
+	end)
+	return success and response or nil
+end
+
+local function findBestServer()
+	local bestServer = nil
+	local cursor = nil
+	repeat
+		local data = getServerList(cursor)
+		if not data then break end
+		for _, server in pairs(data.data) do
+			if server.playing < server.maxPlayers and server.id ~= JobIdToIgnore then
+				if not bestServer or server.playing > bestServer.playing then
+					bestServer = server
+				end
+			end
+		end
+		cursor = data.nextPageCursor
+		wait(0.1)
+	until not cursor
+	return bestServer
+end
+
+local function teleportToBestServer()
+	local server = findBestServer()
+	if server then
+		TeleportService:TeleportToPlaceInstance(PlaceId, server.id, Players.LocalPlayer)
+	else
+		warn("沒有找到適合的伺服器")
+	end
+end
+
+-- 自動執行
+teleportToBestServer()
