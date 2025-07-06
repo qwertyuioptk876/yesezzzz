@@ -1,0 +1,86 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- 靈敏度初始值
+local sensitivityValue = 1
+
+-- GUI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "CameraSensitivityUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = playerGui
+
+local inputFrame = Instance.new("Frame")
+inputFrame.Size = UDim2.new(0, 180, 0, 50)
+inputFrame.Position = UDim2.new(0, 20, 0, 100)
+inputFrame.BackgroundTransparency = 0.2
+inputFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+inputFrame.BorderSizePixel = 0
+inputFrame.Active = true
+inputFrame.Draggable = true -- 可拖曳
+inputFrame.ClipsDescendants = true
+inputFrame.ZIndex = 10
+inputFrame.Name = "InputFrame"
+inputFrame:SetAttribute("LastValue", sensitivityValue)
+inputFrame.Parent = screenGui
+
+-- 圓角
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 10)
+corner.Parent = inputFrame
+
+-- 輸入框
+local textBox = Instance.new("TextBox")
+textBox.Size = UDim2.new(1, -20, 1, -10)
+textBox.Position = UDim2.new(0, 10, 0, 5)
+textBox.BackgroundTransparency = 1
+textBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+textBox.TextScaled = true
+textBox.PlaceholderText = "鏡頭靈敏度 (如 1.5)"
+textBox.Font = Enum.Font.SourceSansSemibold
+textBox.Text = tostring(sensitivityValue)
+textBox.ClearTextOnFocus = false
+textBox.ZIndex = 11
+textBox.Parent = inputFrame
+
+-- 轉鏡頭靈敏度調整
+local function applyCameraSensitivity(value)
+	sensitivityValue = value
+	-- 將靈敏度應用於裝置
+	if UserInputService.TouchEnabled then
+		-- 手機轉鏡頭靈敏度（會改變 TouchRotateSensitivity）
+		game:GetService("UserGameSettings").TouchCameraSensitivity = sensitivityValue
+	else
+		-- 電腦端轉鏡頭靈敏度
+		game:GetService("UserGameSettings").MouseSensitivity = sensitivityValue
+	end
+	print("轉鏡頭靈敏度已設定為：" .. tostring(sensitivityValue))
+end
+
+-- 當輸入框數字變更
+textBox.FocusLost:Connect(function(enterPressed)
+	if enterPressed then
+		local input = tonumber(textBox.Text)
+		if input and input > 0 then
+			applyCameraSensitivity(input)
+			inputFrame:SetAttribute("LastValue", input)
+		else
+			textBox.Text = tostring(sensitivityValue)
+		end
+	end
+end)
+
+-- 玩家復活時維持設定
+player.CharacterAdded:Connect(function()
+	task.wait(1)
+	local val = inputFrame:GetAttribute("LastValue")
+	if val then
+		applyCameraSensitivity(val)
+	end
+end)
+
+-- 啟動時也套用一次
+applyCameraSensitivity(sensitivityValue)
